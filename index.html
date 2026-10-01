@@ -78,9 +78,11 @@
       <form id="login-form">
         <label for="email">E-mail</label>
         <input id="email" type="email" required placeholder="voce@email.com" autocomplete="email" />
-        <button class="primary" type="submit">Receber link de acesso</button>
+        <label for="senha">Senha</label>
+        <input id="senha" type="password" required minlength="6" placeholder="mínimo 6 caracteres" autocomplete="current-password" />
+        <button class="primary" type="submit">Entrar e votar</button>
       </form>
-      <button class="primary" id="google" type="button" style="background:#fff;color:#1a1400;margin-top:8px;">Entrar com Google</button>
+      <p class="msg">A mesma conta não vota de novo. Na primeira vez, a senha fica criada nesse e-mail.</p>
     </section>
 
     <section class="panel" id="session" hidden>
@@ -192,31 +194,26 @@
       document.getElementById("login-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("senha").value;
         const btn = e.target.querySelector("button");
+        const msg = document.getElementById("login-msg");
         btn.disabled = true;
-        const { error } = await sb.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: location.href }
-        });
+        let { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) {
+          const criado = await sb.auth.signUp({ email, password });
+          error = criado.error;
+        }
         btn.disabled = false;
-        document.getElementById("login-msg").textContent = error
-          ? error.message
-          : "Link enviado. Abra o e-mail neste mesmo aparelho e volte para votar.";
-        if (error) document.getElementById("login-msg").className = "msg err";
+        if (error) {
+          msg.className = "msg err";
+          msg.textContent = error.message;
+        } else {
+          msg.className = "msg";
+          msg.textContent = "Conta pronta. Escolha um candidato.";
+        }
       });
 
       document.getElementById("logout").addEventListener("click", () => sb.auth.signOut());
-
-      document.getElementById("google").addEventListener("click", async () => {
-        const { error } = await sb.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: location.href }
-        });
-        if (error) {
-          document.getElementById("login-msg").className = "msg err";
-          document.getElementById("login-msg").textContent = error.message;
-        }
-      });
 
       document.getElementById("cards").addEventListener("click", async (e) => {
         const btn = e.target.closest("button.card");
