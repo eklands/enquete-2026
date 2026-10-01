@@ -160,6 +160,12 @@
       user = data.session?.user || null;
       if (user) showSession();
       await refresh();
+      sb.channel("votos-ao-vivo")
+        .on("postgres_changes", { event: "*", schema: "public", table: "votos" }, () => {
+          refresh().catch(() => {});
+        })
+        .subscribe();
+      setInterval(() => refresh().catch(() => {}), 5000);
 
       sb.auth.onAuthStateChange(async (_event, session) => {
         user = session?.user || null;
