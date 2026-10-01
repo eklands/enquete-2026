@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eleições 2026 — Escolha seu candidato</title>
+  <meta name="description" content="Participe da enquete popular. Aqui o IBOPE é verídico." />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#0c1a12; --card:#13261b; --gold:#ffdf00; --ink:#f4f7f2; --muted:#b7c4b8; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--ink);
+      font-family: Outfit, system-ui, sans-serif;
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(0,156,59,.35), transparent 60%),
+        radial-gradient(800px 480px at 100% 0%, rgba(0,39,118,.45), transparent 55%), var(--bg);
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 36px 20px 64px; }
+    .flag { letter-spacing: .14em; text-transform: uppercase; font-size: 12px; color: var(--gold); font-weight: 700; }
+    h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(34px, 6vw, 62px); line-height: .95; margin: 14px 0 10px; max-width: 14ch; }
+    .sub { color: var(--muted); font-size: 18px; margin: 0; }
+    .tag { display: inline-block; margin: 12px 0 22px; padding: 8px 12px; border: 1px solid rgba(255,223,0,.18); border-radius: 999px; color: var(--gold); background: rgba(255,223,0,.08); font-weight: 600; }
+    .panel, .card {
+      background: var(--card); border: 1px solid rgba(255,255,255,.08); border-radius: 22px;
+    }
+    .panel { padding: 18px; margin-bottom: 18px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input, button.primary {
+      width: 100%; border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+      background: #0c1a12; color: var(--ink); padding: 12px 14px; font: inherit;
+    }
+    button.primary { margin-top: 10px; background: var(--gold); color: #1a1400; font-weight: 700; cursor: pointer; border: 0; }
+    button.primary:disabled { opacity: .6; cursor: default; }
+    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+    .ghost { background: transparent; color: var(--muted); border: 0; cursor: pointer; font: inherit; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    button.card { appearance: none; text-align: left; cursor: pointer; color: inherit; padding: 18px; width: 100%; }
+    button.card:disabled { cursor: default; opacity: .95; }
+    button.card.chosen { border-color: var(--gold); }
+    .avatar { height: 92px; border-radius: 16px; display: flex; align-items: flex-end; padding: 12px; font-weight: 700; }
+    .bolso .avatar { background: linear-gradient(135deg, #1f4bff, #0a1d66); }
+    .lula .avatar { background: linear-gradient(135deg, #e11d2e, #7a0c18); }
+    .name { font-size: 26px; margin: 14px 0 4px; font-weight: 700; }
+    .party { color: var(--muted); min-height: 40px; }
+    .bar { height: 10px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; margin-top: 16px; }
+    .bar span { display: block; height: 100%; width: 0; }
+    .bolso .bar span { background: #4d74ff; }
+    .lula .bar span { background: #ff4d62; }
+    .stats { display: flex; justify-content: space-between; margin-top: 8px; font-variant-numeric: tabular-nums; }
+    .total, footer, .msg { margin-top: 16px; color: #8ea094; font-size: 14px; line-height: 1.5; }
+    .msg { color: var(--gold); }
+    .err { color: #ffb4b4; }
+    code { color: var(--gold); }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="flag">Enquete popular · Brasil</div>
+    <h1>Eleições 2026 — Escolha seu candidato</h1>
+    <p class="sub">Participe da enquete popular</p>
+    <div class="tag">Aqui o IBOPE é verídico.</div>
+    <p class="sub">Dispare para seus parentes e amigos e acompanhe a realidade do IBOPE.</p>
+
+    <section class="panel" id="setup" hidden>
+      <strong>Falta configurar o Supabase.</strong>
+      <p class="msg">Abra <code>config.js</code>, cole a URL e a chave anon, rode <code>supabase.sql</code> e ative o login por e-mail. Sem isso o voto não trava.</p>
+    </section>
+
+    <section class="panel" id="login">
+      <div class="row">
+        <strong>Entre com seu e-mail para votar uma vez</strong>
+      </div>
+      <p class="msg" id="login-msg">A conta fica ligada ao voto. O mesmo e-mail não vota de novo.</p>
+      <form id="login-form">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" required placeholder="voce@email.com" autocomplete="email" />
+        <button class="primary" type="submit">Receber link de acesso</button>
+      </form>
+    </section>
+
+    <section class="panel" id="session" hidden>
+      <div class="row">
+        <span id="who"></span>
+        <button class="ghost" id="logout" type="button">Sair</button>
+      </div>
+    </section>
+
+    <section class="grid" id="cards">
+      <button class="card bolso" data-id="bolsonaro" type="button" disabled>
+        <div class="avatar">22</div>
+        <div class="name">Jair Bolsonaro</div>
+        <div class="party">Candidato da enquete</div>
+        <div class="bar"><span id="bar-bolsonaro"></span></div>
+        <div class="stats"><strong id="pct-bolsonaro">0%</strong><span id="n-bolsonaro">0 votos</span></div>
+      </button>
+      <button class="card lula" data-id="lula" type="button" disabled>
+        <div class="avatar">13</div>
+        <div class="name">Luiz Inácio Lula da Silva</div>
+        <div class="party">Candidato da enquete</div>
+        <div class="bar"><span id="bar-lula"></span></div>
+        <div class="stats"><strong id="pct-lula">0%</strong><span id="n-lula">0 votos</span></div>
+      </button>
+    </section>
+    <p class="total" id="total">Total: 0 votos</p>
+    <p class="msg" id="status"></p>
+    <footer>Enquete informal, sem valor de urna. Um e-mail confirmado, um voto. Não é pesquisa do IBOPE.</footer>
+  </main>
+  <script type="module">
+    import { SUPABASE_URL, SUPABASE_ANON } from "./config.js";
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+    const ready = SUPABASE_URL.startsWith("http") && SUPABASE_ANON && !SUPABASE_ANON.startsWith("COLE");
+    const status = document.getElementById("status");
+    let sb = null;
+    let user = null;
+    let myVote = null;
+
+    function paint(v) {
+      const total = v.bolsonaro + v.lula;
+      for (const id of ["bolsonaro", "lula"]) {
+        const pct = total ? Math.round((v[id] / total) * 100) : 0;
+        document.getElementById("pct-" + id).textContent = pct + "%";
+        document.getElementById("n-" + id).textContent = v[id] + (v[id] === 1 ? " voto" : " votos");
+        document.getElementById("bar-" + id).style.width = pct + "%";
+        const card = document.querySelector(`[data-id="${id}"]`);
+        card.classList.toggle("chosen", myVote === id);
+        card.disabled = !user || !!myVote;
+      }
+      document.getElementById("total").textContent = "Total: " + total + (total === 1 ? " voto" : " votos");
+    }
+
+    async function refresh() {
+      const { data, error } = await sb.from("votos").select("candidato,user_id");
+      if (error) throw error;
+      const v = { bolsonaro: 0, lula: 0 };
+      myVote = null;
+      for (const row of data) {
+        if (v[row.candidato] !== undefined) v[row.candidato] += 1;
+        if (user && row.user_id === user.id) myVote = row.candidato;
+      }
+      paint(v);
+      if (myVote) status.textContent = "Seu voto já foi registrado. Esta conta não vota de novo.";
+      else if (user) status.textContent = "Escolha um candidato. Esta conta só vota uma vez.";
+    }
+
+    function showSession() {
+      document.getElementById("login").hidden = true;
+      document.getElementById("session").hidden = false;
+      document.getElementById("who").textContent = user.email;
+    }
+
+    if (!ready) {
+      document.getElementById("setup").hidden = false;
+      document.getElementById("login").hidden = true;
+    } else {
+      sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+      const { data } = await sb.auth.getSession();
+      user = data.session?.user || null;
+      if (user) showSession();
+      await refresh();
+
+      sb.auth.onAuthStateChange(async (_event, session) => {
+        user = session?.user || null;
+        if (user) showSession();
+        else {
+          document.getElementById("login").hidden = false;
+          document.getElementById("session").hidden = true;
+          myVote = null;
+        }
+        await refresh();
+      });
+
+      document.getElementById("login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("email").value.trim();
+        const btn = e.target.querySelector("button");
+        btn.disabled = true;
+        const { error } = await sb.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: location.href }
+        });
+        btn.disabled = false;
+        document.getElementById("login-msg").textContent = error
+          ? error.message
+          : "Link enviado. Abra o e-mail neste mesmo aparelho e volte para votar.";
+        if (error) document.getElementById("login-msg").className = "msg err";
+      });
+
+      document.getElementById("logout").addEventListener("click", () => sb.auth.signOut());
+
+      document.getElementById("cards").addEventListener("click", async (e) => {
+        const btn = e.target.closest("button.card");
+        if (!btn || !user || myVote) return;
+        btn.disabled = true;
+        const { error } = await sb.from("votos").insert({
+          user_id: user.id,
+          email: user.email,
+          candidato: btn.dataset.id
+        });
+        if (error) {
+          status.className = "msg err";
+          status.textContent = error.code === "23505"
+            ? "Esta conta já votou."
+            : "Não foi possível votar. Confira se o SQL foi executado.";
+          await refresh();
+          return;
+        }
+        status.className = "msg";
+        await refresh();
+      });
+    }
+  </script>
+</body>
+</html>
