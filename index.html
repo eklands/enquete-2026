@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -71,37 +70,24 @@
       <p class="msg">Abra <code>config.js</code>, cole a URL e a chave anon, rode <code>supabase.sql</code> e ative o login por e-mail. Sem isso o voto não trava.</p>
     </section>
 
-    <section class="panel" id="login">
-      <div class="row">
-        <strong>Entre com seu e-mail para votar uma vez</strong>
-      </div>
-      <p class="msg" id="login-msg">Se a conta Google já está neste aparelho, é um clique.</p>
-      <a class="primary" id="google" href="https://mompjlzzvfuwlptcdtkk.supabase.co/auth/v1/authorize?provider=google&redirect_to=https%3A%2F%2Feklands.github.io%2Fenquete-2026%2F" style="display:block;text-align:center;text-decoration:none;">Entrar com Google e votar</a>
-    </section>
-
-    <section class="panel" id="session" hidden>
-      <div class="row">
-        <span id="who"></span>
-        <button class="ghost" id="logout" type="button">Sair</button>
-      </div>
-    </section>
+    <p class="msg" id="status">Clique em um candidato. Neste aparelho, só um voto.</p>
 
     <section class="grid" id="cards">
-      <button class="card bolso" data-id="bolsonaro" type="button" disabled>
+      <button class="card bolso" data-id="bolsonaro" type="button">
         <div class="avatar">22</div>
         <div class="name">Jair Bolsonaro</div>
         <div class="party">Candidato da enquete</div>
         <div class="bar"><span id="bar-bolsonaro"></span></div>
         <div class="stats"><strong id="pct-bolsonaro">0%</strong><span id="n-bolsonaro">0 votos</span></div>
       </button>
-      <button class="card lula" data-id="lula" type="button" disabled>
+      <button class="card lula" data-id="lula" type="button">
         <div class="avatar">13</div>
         <div class="name">Luiz Inácio Lula da Silva</div>
         <div class="party">Candidato da enquete</div>
         <div class="bar"><span id="bar-lula"></span></div>
         <div class="stats"><strong id="pct-lula">0%</strong><span id="n-lula">0 votos</span></div>
       </button>
-      <button class="card nulo" data-id="nulo" type="button" disabled>
+      <button class="card nulo" data-id="nulo" type="button">
         <div class="avatar">Nulo</div>
         <div class="name">Nulo</div>
         <div class="party">Não escolhe candidato</div>
@@ -110,8 +96,7 @@
       </button>
     </section>
     <p class="total" id="total">Total: 0 votos</p>
-    <p class="msg" id="status"></p>
-    <footer>Enquete informal, sem valor de urna. Um e-mail confirmado, um voto. Não é pesquisa do IBOPE.</footer>
+    <footer>Enquete informal, sem valor de urna. Não é pesquisa do IBOPE.</footer>
   </main>
   <script type="module">
     import { SUPABASE_URL, SUPABASE_ANON } from "./config.js";
@@ -119,9 +104,18 @@
 
     const ready = SUPABASE_URL.startsWith("http") && SUPABASE_ANON && !SUPABASE_ANON.startsWith("COLE");
     const status = document.getElementById("status");
+    const VOTE_KEY = "enquete-2026-aparelho";
     let sb = null;
-    let user = null;
-    let myVote = null;
+    let myVote = localStorage.getItem(VOTE_KEY);
+
+    function deviceId() {
+      let id = localStorage.getItem("enquete-2026-device");
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("enquete-2026-device", id);
+      }
+      return id;
+    }
 
     const ids = ["bolsonaro", "lula", "nulo"];
     function paint(v) {
@@ -133,99 +127,54 @@
         document.getElementById("bar-" + id).style.width = pct + "%";
         const card = document.querySelector(`[data-id="${id}"]`);
         card.classList.toggle("chosen", myVote === id);
-        card.disabled = !user || !!myVote;
+        card.disabled = !!myVote;
       }
       document.getElementById("total").textContent = "Total: " + total + (total === 1 ? " voto" : " votos");
+      if (myVote) status.textContent = "Este aparelho já votou.";
     }
 
     async function refresh() {
-      const { data, error } = await sb.from("votos").select("candidato,user_id");
-      if (error) throw error;
       const v = { bolsonaro: 0, lula: 0, nulo: 0 };
-      myVote = null;
-      for (const row of data) {
+      const antigo = await sb.from("votos").select("candidato");
+      const aberto = await sb.from("votos_abertos").select("candidato,device_id");
+      for (const row of [...(antigo.data || []), ...(aberto.data || [])]) {
         if (v[row.candidato] !== undefined) v[row.candidato] += 1;
-        if (user && row.user_id === user.id) myVote = row.candidato;
+        if (row.device_id && row.device_id === deviceId()) myVote = row.candidato;
       }
+      if (myVote) localStorage.setItem(VOTE_KEY, myVote);
       paint(v);
-      if (myVote) status.textContent = "Seu voto já foi registrado. Esta conta não vota de novo.";
-      else if (user) status.textContent = "Escolha um candidato. Esta conta só vota uma vez.";
-    }
-
-    function showSession() {
-      document.getElementById("login").hidden = true;
-      document.getElementById("session").hidden = false;
-      document.getElementById("who").textContent = user.email;
     }
 
     if (!ready) {
       document.getElementById("setup").hidden = false;
-      document.getElementById("login").hidden = true;
     } else {
       sb = createClient(SUPABASE_URL, SUPABASE_ANON);
-      const { data } = await sb.auth.getSession();
-      user = data.session?.user || null;
-      if (user) showSession();
       await refresh();
       sb.channel("votos-ao-vivo")
-        .on("postgres_changes", { event: "*", schema: "public", table: "votos" }, () => {
+        .on("postgres_changes", { event: "*", schema: "public", table: "votos_abertos" }, () => {
           refresh().catch(() => {});
         })
         .subscribe();
       setInterval(() => refresh().catch(() => {}), 5000);
 
-      sb.auth.onAuthStateChange(async (_event, session) => {
-        user = session?.user || null;
-        if (user) showSession();
-        else {
-          document.getElementById("login").hidden = false;
-          document.getElementById("session").hidden = true;
-          myVote = null;
-        }
-        await refresh();
-      });
-
-      document.getElementById("login-form").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = document.getElementById("email").value.trim();
-        const password = document.getElementById("senha").value;
-        const btn = e.target.querySelector("button");
-        const msg = document.getElementById("login-msg");
-        btn.disabled = true;
-        let { error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) {
-          const criado = await sb.auth.signUp({ email, password });
-          error = criado.error;
-        }
-        btn.disabled = false;
-        if (error) {
-          msg.className = "msg err";
-          msg.textContent = error.message;
-        } else {
-          msg.className = "msg";
-          msg.textContent = "Conta pronta. Escolha um candidato.";
-        }
-      });
-
-      document.getElementById("logout").addEventListener("click", () => sb.auth.signOut());
-
       document.getElementById("cards").addEventListener("click", async (e) => {
         const btn = e.target.closest("button.card");
-        if (!btn || !user || myVote) return;
+        if (!btn || myVote) return;
         btn.disabled = true;
-        const { error } = await sb.from("votos").insert({
-          user_id: user.id,
-          email: user.email,
+        const { error } = await sb.from("votos_abertos").insert({
+          device_id: deviceId(),
           candidato: btn.dataset.id
         });
         if (error) {
           status.className = "msg err";
           status.textContent = error.code === "23505"
-            ? "Esta conta já votou."
-            : "Não foi possível votar. Confira se o SQL foi executado.";
+            ? "Este aparelho já votou."
+            : "Não foi possível votar. Rode o SQL novo no Supabase.";
           await refresh();
           return;
         }
+        myVote = btn.dataset.id;
+        localStorage.setItem(VOTE_KEY, myVote);
         status.className = "msg";
         await refresh();
       });
@@ -233,4 +182,3 @@
   </script>
 </body>
 </html>
-ml>
