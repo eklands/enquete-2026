@@ -34,7 +34,7 @@
     button.primary:disabled { opacity: .6; cursor: default; }
     .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
     .ghost { background: transparent; color: var(--muted); border: 0; cursor: pointer; font: inherit; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
     button.card { appearance: none; text-align: left; cursor: pointer; color: inherit; padding: 18px; width: 100%; }
     button.card:disabled { cursor: default; opacity: .95; }
@@ -48,6 +48,8 @@
     .bar span { display: block; height: 100%; width: 0; }
     .bolso .bar span { background: #4d74ff; }
     .lula .bar span { background: #ff4d62; }
+    .nulo .avatar { background: linear-gradient(135deg, #5c6570, #2a3036); }
+    .nulo .bar span { background: #c5ccd3; }
     .stats { display: flex; justify-content: space-between; margin-top: 8px; font-variant-numeric: tabular-nums; }
     .total, footer, .msg { margin-top: 16px; color: #8ea094; font-size: 14px; line-height: 1.5; }
     .msg { color: var(--gold); }
@@ -102,6 +104,13 @@
         <div class="bar"><span id="bar-lula"></span></div>
         <div class="stats"><strong id="pct-lula">0%</strong><span id="n-lula">0 votos</span></div>
       </button>
+      <button class="card nulo" data-id="nulo" type="button" disabled>
+        <div class="avatar">Nulo</div>
+        <div class="name">Nulo</div>
+        <div class="party">Não escolhe candidato</div>
+        <div class="bar"><span id="bar-nulo"></span></div>
+        <div class="stats"><strong id="pct-nulo">0%</strong><span id="n-nulo">0 votos</span></div>
+      </button>
     </section>
     <p class="total" id="total">Total: 0 votos</p>
     <p class="msg" id="status"></p>
@@ -117,9 +126,10 @@
     let user = null;
     let myVote = null;
 
+    const ids = ["bolsonaro", "lula", "nulo"];
     function paint(v) {
-      const total = v.bolsonaro + v.lula;
-      for (const id of ["bolsonaro", "lula"]) {
+      const total = ids.reduce((s, id) => s + v[id], 0);
+      for (const id of ids) {
         const pct = total ? Math.round((v[id] / total) * 100) : 0;
         document.getElementById("pct-" + id).textContent = pct + "%";
         document.getElementById("n-" + id).textContent = v[id] + (v[id] === 1 ? " voto" : " votos");
@@ -134,7 +144,7 @@
     async function refresh() {
       const { data, error } = await sb.from("votos").select("candidato,user_id");
       if (error) throw error;
-      const v = { bolsonaro: 0, lula: 0 };
+      const v = { bolsonaro: 0, lula: 0, nulo: 0 };
       myVote = null;
       for (const row of data) {
         if (v[row.candidato] !== undefined) v[row.candidato] += 1;
