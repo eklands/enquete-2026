@@ -36,9 +36,14 @@
     .ghost { background: transparent; color: var(--muted); border: 0; cursor: pointer; font: inherit; }
     .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
-    button.card { appearance: none; text-align: left; cursor: pointer; color: inherit; padding: 18px; width: 100%; }
-    button.card:disabled { cursor: default; opacity: .95; }
-    button.card.chosen { border-color: var(--gold); }
+    .card { text-align: left; color: inherit; padding: 18px; width: 100%; }
+    .card.chosen { border-color: var(--gold); }
+    .vote {
+      width: 100%; margin-top: 14px; border: 0; border-radius: 12px; cursor: pointer;
+      background: var(--gold); color: #1a1400; font: inherit; font-weight: 800;
+      letter-spacing: .08em; padding: 12px 14px;
+    }
+    .vote:disabled { opacity: .55; cursor: default; }
     .avatar { height: 92px; border-radius: 16px; display: flex; align-items: flex-end; padding: 12px; font-weight: 700; }
     .bolso .avatar { background: linear-gradient(135deg, #1f4bff, #0a1d66); }
     .lula .avatar { background: linear-gradient(135deg, #e11d2e, #7a0c18); }
@@ -51,7 +56,12 @@
     .nulo .avatar { background: linear-gradient(135deg, #5c6570, #2a3036); }
     .nulo .bar span { background: #c5ccd3; }
     .stats { display: flex; justify-content: space-between; margin-top: 8px; font-variant-numeric: tabular-nums; }
-    .total, footer, .msg { margin-top: 16px; color: #8ea094; font-size: 14px; line-height: 1.5; }
+    .chart-box { display: flex; gap: 22px; align-items: center; margin: 8px 0 22px; }
+    .donut { width: 168px; height: 168px; border-radius: 50%; flex: 0 0 auto; position: relative; }
+    .donut:after { content: ""; position: absolute; inset: 34px; border-radius: 50%; background: var(--card); }
+    .legend { display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+    .legend b { color: var(--ink); }
+    @media (max-width: 720px) { .chart-box { flex-direction: column; align-items: flex-start; } }
     .msg { color: var(--gold); }
     .err { color: #ffb4b4; }
     code { color: var(--gold); }
@@ -70,30 +80,41 @@
       <p class="msg">Abra <code>config.js</code>, cole a URL e a chave anon, rode <code>supabase.sql</code> e ative o login por e-mail. Sem isso o voto não trava.</p>
     </section>
 
-    <p class="msg" id="status">Clique em um candidato. Neste aparelho, só um voto.</p>
+    <p class="msg" id="status">Clique em VOTE. Neste aparelho, só um voto.</p>
+    <section class="chart-box" aria-label="Gráfico da enquete">
+      <div class="donut" id="donut"></div>
+      <div class="legend">
+        <span><b id="leg-bolsonaro">0%</b> Flávio Bolsonaro</span>
+        <span><b id="leg-lula">0%</b> Luiz Inácio Lula da Silva</span>
+        <span><b id="leg-nulo">0%</b> Nulo</span>
+      </div>
+    </section>
 
     <section class="grid" id="cards">
-      <button class="card bolso" data-id="bolsonaro" type="button">
+      <article class="card bolso" data-id="bolsonaro">
         <div class="avatar">22</div>
         <div class="name">Flávio Bolsonaro</div>
         <div class="party">Candidato da enquete</div>
         <div class="bar"><span id="bar-bolsonaro"></span></div>
         <div class="stats"><strong id="pct-bolsonaro">0%</strong><span id="n-bolsonaro">0 votos</span></div>
-      </button>
-      <button class="card lula" data-id="lula" type="button">
+        <button class="vote" type="button">VOTE</button>
+      </article>
+      <article class="card lula" data-id="lula">
         <div class="avatar">13</div>
         <div class="name">Luiz Inácio Lula da Silva</div>
         <div class="party">Candidato da enquete</div>
         <div class="bar"><span id="bar-lula"></span></div>
         <div class="stats"><strong id="pct-lula">0%</strong><span id="n-lula">0 votos</span></div>
-      </button>
-      <button class="card nulo" data-id="nulo" type="button">
+        <button class="vote" type="button">VOTE</button>
+      </article>
+      <article class="card nulo" data-id="nulo">
         <div class="avatar">Nulo</div>
         <div class="name">Nulo</div>
         <div class="party">Não escolhe candidato</div>
         <div class="bar"><span id="bar-nulo"></span></div>
         <div class="stats"><strong id="pct-nulo">0%</strong><span id="n-nulo">0 votos</span></div>
-      </button>
+        <button class="vote" type="button">VOTE</button>
+      </article>
     </section>
     <p class="total" id="total">Total: 0 votos</p>
     <footer>Enquete informal, sem valor de urna. Não é pesquisa do IBOPE.</footer>
@@ -127,9 +148,25 @@
         document.getElementById("bar-" + id).style.width = pct + "%";
         const card = document.querySelector(`[data-id="${id}"]`);
         card.classList.toggle("chosen", myVote === id);
-        card.disabled = !!myVote;
+        card.querySelector(".vote").disabled = !!myVote;
+        card.querySelector(".vote").textContent = myVote === id ? "VOTOU" : "VOTE";
       }
       document.getElementById("total").textContent = "Total: " + total + (total === 1 ? " voto" : " votos");
+      const cores = { bolsonaro: "#4d74ff", lula: "#ff4d62", nulo: "#c5ccd3" };
+      let giro = 0;
+      const fatias = total
+        ? ids.map((id) => {
+            const parte = (v[id] / total) * 100;
+            const trecho = `${cores[id]} ${giro}% ${giro + parte}%`;
+            giro += parte;
+            return trecho;
+          }).join(", ")
+        : "#243328 0% 100%";
+      document.getElementById("donut").style.background = `conic-gradient(${fatias})`;
+      for (const id of ids) {
+        const pct = total ? Math.round((v[id] / total) * 100) : 0;
+        document.getElementById("leg-" + id).textContent = pct + "%";
+      }
       if (myVote) status.textContent = "Este aparelho já votou.";
     }
 
@@ -158,12 +195,13 @@
       setInterval(() => refresh().catch(() => {}), 5000);
 
       document.getElementById("cards").addEventListener("click", async (e) => {
-        const btn = e.target.closest("button.card");
+        const btn = e.target.closest("button.vote");
         if (!btn || myVote) return;
+        const card = btn.closest(".card");
         btn.disabled = true;
         const { error } = await sb.from("votos_abertos").insert({
           device_id: deviceId(),
-          candidato: btn.dataset.id
+          candidato: card.dataset.id
         });
         if (error) {
           status.className = "msg err";
@@ -173,7 +211,7 @@
           await refresh();
           return;
         }
-        myVote = btn.dataset.id;
+        myVote = card.dataset.id;
         localStorage.setItem(VOTE_KEY, myVote);
         status.className = "msg";
         await refresh();
